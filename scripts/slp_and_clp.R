@@ -1,5 +1,8 @@
 # Produce lexis surfaces and comparative level plots 
 
+# Load dependencies and data  ---------------------------------------------
+
+
 rm(list = ls())
 
 pacman::p_load(
@@ -20,6 +23,9 @@ lookup <- read_csv("data/tidied/code_lookup.csv")
 # CLP Scotland - England & Wales
 # CLP Scotland - NI
 # CLP Scotland - Ireland 
+
+
+# SLP for British Isles --------------------------------------------------------------
 
 
 dta %>% 
@@ -74,6 +80,9 @@ ggsave("figures/slp_scot_neighbours.png",
        height = 30, width = 20, dpi = 300
        )
 # Now comparative level plots 
+
+
+# CLP For British Isles ---------------------------------------------------
 
 
 
@@ -142,7 +151,8 @@ ggsave("figures/clp_scot_neighbours.png",
        height = 30, width = 15, dpi = 300
 )
 
-# For other places  -------------------------------------------------------
+# SLP For elsewhere -------------------------------------------------------
+
 
 
 # Level Plot
@@ -218,6 +228,9 @@ ggsave("figures/slp_other.png",
 # Taiwan compared with Japan
 # Germany compared with England and Wales
 # United States compared with Norway
+
+# CLP for elsewhere -------------------------------------------------------
+
 
 
 dta %>% 
@@ -304,6 +317,9 @@ ggsave("figures/clp_other.png",
 # CLP Scotland - Ireland 
 
 
+# SLP, British Isles, recent ----------------------------------------------
+
+
 dta %>% 
   filter(code %in% c("GBR_SCO", "GBRCENW", "GBR_NIR", "IRL")) %>% 
   left_join(lookup) %>% 
@@ -357,6 +373,9 @@ ggsave("figures/slp_scot_neighbours_recent.png",
        height = 30, width = 16, dpi = 300
 )
 # Now comparative level plots 
+
+
+# CLP, British Isles, Recent ----------------------------------------------
 
 
 
@@ -425,7 +444,8 @@ ggsave("figures/clp_scot_neighbours_recent.png",
        height = 30, width = 16, dpi = 300
 )
 
-# For other places  -------------------------------------------------------
+
+# SLP, Elsewhere, Recent --------------------------------------------------
 
 
 # Level Plot
@@ -504,6 +524,9 @@ ggsave("figures/slp_other_recent.png",
 # United States compared with Norway
 
 
+# CLP, Elsewhere, Recent --------------------------------------------------
+
+
 dta %>% 
   bind_rows(tmp) %>% 
   filter(code %in% c("TWN", "JPN", "DEUT","NOR", "USA", "GBRCENW")) %>%
@@ -574,8 +597,7 @@ ggsave("figures/clp_other_recent.png",
 )
 
 
-
-# Legend plot 
+# Plain Template for guide plots ------------------------------------------
 
 
 dta %>% 
@@ -627,3 +649,78 @@ dta %>%
 
 ggsave("figures/plain_template.svg")
 ggsave("figures/plain_template.eps")
+
+
+
+# CLP, British Isles, Ident -----------------------------------------------
+
+# Doeesn't really work - don't bother
+
+
+dta %>% 
+  filter(code %in% c("GBR_SCO", "GBRCENW", "GBR_NIR", "IRL")) %>% 
+  left_join(lookup) %>% 
+  mutate(population_name = factor(
+    population_name,
+    ordered = T,
+    levels = c("Scotland", "England and Wales", "Northern Ireland", "Ireland")
+  )
+  ) %>% 
+  filter(sex != "total") %>% 
+  filter(age <= 100) %>% 
+  mutate(mr = 10000 * death_count / exposure) %>% 
+  select(place =  population_name, year, age, sex, mr) %>% 
+  spread(place, mr) %>% 
+  mutate(`cf England and Wales` = `Scotland` - `England and Wales`) %>% 
+  mutate(`cf Northern Ireland` = `Scotland` - `Northern Ireland`) %>% 
+  mutate(`cf Ireland` = `Scotland` - `Ireland`) %>% 
+  filter(year >= 1950) %>% 
+  select(year, age, sex, `cf England and Wales`, `cf Northern Ireland`, `cf Ireland`) %>% 
+  gather(key = place, value = dif_mr, `cf England and Wales`:`cf Ireland`) -> dta_comparative_scot
+
+dta_comparative_scot %>% 
+  ggplot(aes(x = dif_mr, fill = place)) + 
+  geom_density() + 
+  facet_wrap(~sex)
+
+  
+
+dta_comparative_scot %>% 
+  mutate(dif_lmr = case_when(
+    dif_mr < -1000 ~ -1000,
+    dif_mr > 1000  ~ 1000,
+    TRUE ~ dif_mr
+  )
+  ) %>%
+  filter(age <= 90) %>% 
+  ggplot(aes(x = year, y = age, fill = dif_mr)) +
+  geom_tile() +
+  facet_grid(place ~ sex) + 
+  scale_fill_gradientn(
+    expression(paste("Difference")),
+    colours = scales::brewer_pal(palette = "RdBu", direction = -1)(11),
+    limits = c(-1000, 1000)
+  ) + 
+  theme_dark(
+  ) +
+  theme(
+    strip.text = element_text(face = "bold"),
+    legend.position = "bottom",
+    axis.text.x = element_text(angle = 90),
+    text = element_text(size=16),
+    legend.key.width = unit(0.07, "npc")
+  ) + 
+  coord_equal() +
+  labs(title = "Comparative Levelplot - Scotland\nand its Neighbours",
+       x = "Year", y = "Age in years",
+       subtitle = "Source: Human Mortality Database") +
+  scale_x_continuous(
+    minor_breaks = seq(1950, 2010, by = 10),
+    breaks = seq(1960, 2010, by = 20)
+  ) +
+  scale_y_continuous(
+    minor_breaks = seq(0, 100, by = 10),
+    breaks = seq(0, 100, by = 20)
+  )
+
+
