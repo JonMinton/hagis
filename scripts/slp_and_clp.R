@@ -724,3 +724,79 @@ dta_comparative_scot %>%
   )
 
 
+
+# CLP Scot USA
+
+# CLP For British Isles ---------------------------------------------------
+
+
+
+dta %>% 
+  filter(code %in% c("GBR_SCO", "USA")) %>% 
+  filter(sex != "total") %>% 
+  group_by(code, year, age, sex) %>% 
+  summarise( # duplication in USA
+    death_count = mean(death_count, na.rm = T),
+    population_count = mean(population_count, na.rm = T),
+    exposure = mean(exposure, na.rm = T)
+  ) %>% 
+  ungroup %>% 
+  left_join(lookup) %>% 
+  mutate(population_name = factor(
+    population_name,
+    ordered = T,
+    levels = c("Scotland", "The United States of America")
+    )
+  ) %>% 
+  filter(age <= 100) %>% 
+  mutate(mr = death_count / exposure) %>% 
+  mutate(lmr = log(mr, 10)) %>% 
+  select(place =  population_name, year, age, sex, lmr) %>% 
+  spread(place, lmr) %>% 
+  mutate(`cf USA` = `Scotland` - `The United States of America`) %>% 
+  filter(year >= 1950) %>% 
+  select(year, age, sex, `cf USA`) %>% 
+  gather(key = place, value = dif_lmr, `cf USA`) -> dta_comparative_scot
+
+
+dta_comparative_scot %>% 
+  mutate(dif_lmr = case_when(
+    dif_lmr < -0.5 ~ -0.5,
+    dif_lmr > 0.5  ~ 0.5,
+    TRUE ~ dif_lmr
+  )
+  ) %>% 
+  ggplot(aes(x = year, y = age, fill = dif_lmr)) +
+  geom_tile() +
+  facet_grid(place ~ sex) + 
+  scale_fill_gradientn(
+    expression(paste("Difference")),
+    colours = scales::brewer_pal(palette = "RdBu", direction = -1)(11),
+    limits = c(-0.5, 0.5)
+  ) + 
+  theme_dark(
+  ) +
+  theme(
+    strip.text = element_text(face = "bold"),
+    legend.position = "bottom",
+    axis.text.x = element_text(angle = 90),
+    text = element_text(size=16),
+    legend.key.width = unit(0.07, "npc")
+  ) + 
+  coord_equal() +
+  labs(title = "Comparative Levelplot - Scotland\nand USA",
+       x = "Year", y = "Age in years",
+       subtitle = "Source: Human Mortality Database") +
+  scale_x_continuous(
+    minor_breaks = seq(1950, 2010, by = 10),
+    breaks = seq(1960, 2010, by = 20)
+  ) +
+  scale_y_continuous(
+    minor_breaks = seq(0, 100, by = 10),
+    breaks = seq(0, 100, by = 20)
+  )
+
+ggsave("figures/clp_scot_usa.png",
+       units = "cm",
+       height = 15, width = 15, dpi = 300
+)
